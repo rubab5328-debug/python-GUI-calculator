@@ -1,0 +1,236 @@
+<!-- <!DOCTYPE html>
+<html>
+<head>
+    <link rel="stylesheet" href="/static/style.css">
+    <title>Calculator</title>
+</head>
+
+<body>
+
+<div class="container">
+    <h2>Simple Calculator</h2>
+
+    <form method="POST">
+
+        <input type="number" name="num1" placeholder="Enter first number" required>
+
+        <input type="number" name="num2" placeholder="Enter second number" required>
+
+        <select name="operation">
+            <option value="1">Add</option>
+            <option value="2">Subtract</option>
+            <option value="3">Divide</option>
+            <option value="4">Multiply</option>
+        </select>
+
+        <button type="submit">Calculate</button>
+    </form>
+
+    {% if result != "" %}
+    <div class="result">
+        Result: {{ result }}
+    </div>
+    {% endif %}
+
+</div>
+
+</body>
+</html> -->
+
+
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Modern Calculator</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+
+<body>
+
+<div class="wrapper">
+    <div class="card">
+        <h2>Modern Calculator</h2>
+
+        <form method="POST">
+
+            <input type="number" name="num1" placeholder="First number" required>
+
+            <input type="number" name="num2" placeholder="Second number" required>
+
+            <select name="operation">
+                <option value="1">Add</option>
+                <option value="2">Subtract</option>
+                <option value="3">Divide</option>
+                <option value="4">Multiply</option>
+            </select>
+
+            <button type="submit">Calculate</button>
+        </form>
+
+        {% if result != None %}
+        <div class="result-box">
+            Result: <span>{{ result }}</span>
+        </div>
+        {% endif %}
+        
+    </div>
+</div>
+
+</body>
+</html> -->
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Windows-style Calculator</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="shell">
+    <div class="calc">
+      <div class="display" id="display">0</div>
+
+      <div class="buttons">
+        <button class="wide" data-fn="ac">AC</button>
+        <button data-fn="c">C</button>
+        <button data-op="/">÷</button>
+
+        <button data-num="7">7</button>
+        <button data-num="8">8</button>
+        <button data-num="9">9</button>
+        <button data-op="*">×</button>
+
+        <button data-num="4">4</button>
+        <button data-num="5">5</button>
+        <button data-num="6">6</button>
+        <button data-op="-">−</button>
+
+        <button data-num="1">1</button>
+        <button data-num="2">2</button>
+        <button data-num="3">3</button>
+        <button data-op="+">+</button>
+
+        <button class="wide" data-num="0">0</button>
+        <button data-num=".">.</button>
+        <button class="equals" data-fn="equals">=</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+/*
+Simple front-end logic:
+- Builds an expression from button clicks
+- Sends two numbers and an operator to the Flask /calc endpoint when = is pressed
+- Keeps behavior like a basic desktop calculator
+*/
+
+let first = "";       // first operand (string)
+let second = "";      // second operand (string)
+let operator = null;  // '+' '-' '*' '/'
+let expectingSecond = false;
+
+const display = document.getElementById('display');
+
+function updateDisplay(text) {
+  display.textContent = text;
+}
+
+// helper to reset
+function resetAll() {
+  first = "";
+  second = "";
+  operator = null;
+  expectingSecond = false;
+  updateDisplay("0");
+}
+
+function clearEntry() {
+  if (!expectingSecond) {
+    first = "";
+    updateDisplay("0");
+  } else {
+    second = "";
+    updateDisplay("0");
+  }
+}
+
+document.querySelectorAll('[data-num]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const val = btn.getAttribute('data-num');
+    if (!expectingSecond) {
+      if (val === '.' && first.includes('.')) return;
+      first = (first === "0" && val !== ".") ? val : first + val;
+      updateDisplay(first || "0");
+    } else {
+      if (val === '.' && second.includes('.')) return;
+      second = (second === "0" && val !== ".") ? val : second + val;
+      updateDisplay(second || "0");
+    }
+  })
+});
+
+document.querySelectorAll('[data-op]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    // if operator already set and second present, chain compute locally by pressing =
+    if (operator && second !== "") {
+      callCalcAndShow().then(() => {
+        operator = btn.getAttribute('data-op');
+        expectingSecond = true;
+      });
+    } else {
+      operator = btn.getAttribute('data-op');
+      expectingSecond = true;
+      if (first === "") first = "0";
+    }
+  })
+});
+
+document.querySelectorAll('[data-fn]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    const fn = btn.getAttribute('data-fn');
+    if (fn === 'ac') {
+      resetAll();
+    } else if (fn === 'c') {
+      clearEntry();
+    } else if (fn === 'equals') {
+      await callCalcAndShow();
+    }
+  })
+});
+
+async function callCalcAndShow(){
+  if (!operator) return;
+  const a = parseFloat(first || "0");
+  const b = parseFloat(second || "0");
+  // POST to backend
+  try {
+    const res = await fetch('/calc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ a, b, op: operator })
+    });
+    const data = await res.json();
+    if (res.ok) {
+      const value = data.result;
+      // show result and prepare for next operation
+      updateDisplay(String(value));
+      first = String(value);
+      second = "";
+      operator = null;
+      expectingSecond = false;
+    } else {
+      updateDisplay(data.error || "Error");
+    }
+  } catch (err) {
+    updateDisplay("Network error");
+  }
+}
+</script>
+</body>
+</html>
+
